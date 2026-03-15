@@ -632,7 +632,7 @@ function renderReport(){
 }
 
 // ══════════════════════════════════════════════════
-// PDF — prawdziwy tekst, bez screenshota
+// PDF — generowany przez backend WeasyPrint (UTF-8)
 // ══════════════════════════════════════════════════
 async function downloadPDF(){
   const btn=document.getElementById('pdf-btn');
@@ -643,304 +643,52 @@ async function downloadPDF(){
     const p=chart.planets;
     const yr=new Date().getFullYear();
     const monthYear=new Date().toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
-    const{jsPDF}=window.jspdf;
 
-    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',putOnlyUsedFonts:true});
-    const PW=210, PH=297, ML=18, MR=18, MT=18, MB=20;
-    const TW=PW-ML-MR;
-    let y=MT;
+    // Build planet table HTML
+    const planetsHtml='<table><thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th><th>Żywioł</th></tr></thead><tbody>'+
+      Object.entries(p).map(([k,v])=>`<tr><td>${PLANET_PL[k]||k}</td><td>${v.sym||''} ${v.sign||''}</td><td>${v.deg||0}°${v.min||0}'</td><td>${v.house?'Dom '+v.house:'—'}</td><td>${v.elementName||''}</td></tr>`).join('')+
+      '</tbody></table>';
 
-    // ── helpers ──────────────────────────────────────
-    function checkPage(needed=6){
-      if(y+needed>PH-MB){ pdf.addPage(); y=MT; }
-    }
+    // Build aspects HTML
+    const aspectsHtml='<table><thead><tr><th>Aspekt</th><th>Planeta 1</th><th>Planeta 2</th><th>Orba</th><th>Natura</th></tr></thead><tbody>'+
+      aspects.slice(0,25).map(a=>`<tr><td>${a.asp.sym} ${a.asp.name}</td><td>${PLANET_PL[a.p1]||a.p1}</td><td>${PLANET_PL[a.p2]||a.p2}</td><td>${a.orb}°</td><td>${a.asp.nature==='harmony'?'Harmonijny':a.asp.nature==='tension'?'Napięciowy':'Neutralny'}</td></tr>`).join('')+
+      '</tbody></table>';
 
-    function setFont(style,size,color){
-      if(style==='bold') pdf.setFont('helvetica','bold');
-      else if(style==='italic') pdf.setFont('helvetica','italic');
-      else pdf.setFont('helvetica','normal');
-      pdf.setFontSize(size);
-      if(color) pdf.setTextColor(...color);
-      else pdf.setTextColor(30,41,59);
-    }
+    const payload={
+      name, date, time:time, birth, reloc,
+      year: yr, month_year: monthYear,
+      planets_html: planetsHtml,
+      aspects_html: aspectsHtml,
+      report_html: reportHtml,
+    };
 
-    function addText(text,x,w,size,style,color,lineH){
-      setFont(style,size,color);
-      const lh=lineH||(size*0.45);
-      const lines=pdf.splitTextToSize(stripHtml(text),w);
-      lines.forEach(line=>{
-        checkPage(lh+1);
-        pdf.text(line,x,y);
-        y+=lh;
-      });
-      return lines.length;
-    }
-
-    function stripHtml(html){
-      return html.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#[0-9]+;/g,'').replace(/\s+/g,' ').trim();
-    }
-
-    function drawLine(col,thick){
-      pdf.setDrawColor(...(col||[201,168,76]));
-      pdf.setLineWidth(thick||0.3);
-      pdf.line(ML,y,PW-MR,y);
-      y+=3;
-    }
-
-    function addH1(text){
-      checkPage(20);
-      setFont('bold',18,[201,168,76]);
-      const lines=pdf.splitTextToSize(text.toUpperCase(),TW);
-      lines.forEach(l=>{pdf.text(l,PW/2,y,{align:'center'}); y+=8;});
-      y+=2;
-    }
-
-    function addH2(text){
-      checkPage(14);
-      y+=4;
-      setFont('bold',12,[30,58,138]);
-      const lines=pdf.splitTextToSize(text,TW);
-      lines.forEach(l=>{pdf.text(l,ML,y); y+=6;});
-      drawLine([201,168,76],0.4);
-    }
-
-    function addH3(text){
-      checkPage(10);
-      y+=3;
-      setFont('bold',10,[122,92,16]);
-      pdf.text(stripHtml(text).toUpperCase(),ML,y);
-      y+=5;
-    }
-
-    function addPara(text){
-      if(!text.trim()) return;
-      setFont('normal',9.5,[30,41,59]);
-      const lh=5;
-      const lines=pdf.splitTextToSize(stripHtml(text),TW);
-      lines.forEach(l=>{checkPage(lh+1); pdf.text(l,ML,y); y+=lh;});
-      y+=2;
-    }
-
-    function addLi(text){
-      setFont('normal',9,[51,65,85]);
-      const bullet='•  ';
-      const indent=4;
-      const lines=pdf.splitTextToSize(stripHtml(text),TW-indent);
-      lines.forEach((l,i)=>{
-        checkPage(5);
-        pdf.text(i===0?bullet:'   ',ML,y);
-        pdf.text(l,ML+indent,y);
-        y+=4.8;
-      });
-    }
-
-    function addOli(text,n){
-      setFont('normal',9,[51,65,85]);
-      const indent=5;
-      const lines=pdf.splitTextToSize(stripHtml(text),TW-indent);
-      lines.forEach((l,i)=>{
-        checkPage(5);
-        pdf.text(i===0?n+'.':'   ',ML,y);
-        pdf.text(l,ML+indent,y);
-        y+=4.8;
-      });
-    }
-
-    // ── Table renderer ────────────────────────────────
-    function addTable(node){
-      const rows=[...node.querySelectorAll('tr')];
-      if(!rows.length) return;
-      const cols=rows[0].children.length||2;
-      const colW=TW/cols;
-      checkPage(10);
-
-      rows.forEach((row,ri)=>{
-        const cells=[...row.children];
-        const isHead=row.parentElement.tagName==='THEAD'||ri===0&&row.querySelector('th');
-        const cellH=6;
-        // estimate row height
-        let maxLines=1;
-        cells.forEach(c=>{
-          const lines=pdf.splitTextToSize(stripHtml(c.textContent),colW-4);
-          if(lines.length>maxLines) maxLines=lines.length;
-        });
-        const rowH=maxLines*cellH+3;
-        checkPage(rowH+2);
-
-        if(isHead){
-          pdf.setFillColor(30,58,138);
-          pdf.rect(ML,y-4,TW,rowH,'F');
-          setFont('bold',8.5,[201,168,76]);
-        } else {
-          if(ri%2===0) pdf.setFillColor(248,250,252);
-          else pdf.setFillColor(255,255,255);
-          pdf.rect(ML,y-4,TW,rowH,'F');
-          setFont('normal',8.5,[30,41,59]);
-        }
-
-        cells.forEach((c,ci)=>{
-          const cx=ML+ci*colW+2;
-          const lines=pdf.splitTextToSize(stripHtml(c.textContent),colW-4);
-          lines.forEach((l,li)=>{ pdf.text(l,cx,y+li*cellH); });
-        });
-
-        // border bottom
-        pdf.setDrawColor(226,232,240);
-        pdf.setLineWidth(0.1);
-        pdf.line(ML,y-4+rowH,PW-MR,y-4+rowH);
-        y+=rowH;
-      });
-      y+=4;
-    }
-
-    // ── Parse HTML nodes recursively ──────────────────
-    function parseNode(node){
-      if(node.nodeType===3){ // text node
-        const t=node.textContent.trim();
-        if(t) addPara(t);
-        return;
-      }
-      const tag=node.tagName?.toLowerCase();
-      if(!tag) return;
-
-      if(tag==='h2'){ addH2(stripHtml(node.innerHTML)); return; }
-      if(tag==='h3'){ addH3(stripHtml(node.innerHTML)); return; }
-      if(tag==='p'){
-        // handle strong/em inline
-        addPara(node.innerHTML);
-        return;
-      }
-      if(tag==='ul'||tag==='ol'){
-        let n=1;
-        [...node.children].forEach(li=>{
-          if(tag==='ol') addOli(li.innerHTML,n++);
-          else addLi(li.innerHTML);
-        });
-        y+=2;
-        return;
-      }
-      if(tag==='table'){ addTable(node); return; }
-      if(tag==='hr'){ drawLine(); return; }
-      if(tag==='strong'||tag==='b'||tag==='em'||tag==='span'||tag==='div'||tag==='section'||tag==='article'){
-        [...node.childNodes].forEach(parseNode);
-        return;
-      }
-      // default: recurse
-      [...node.childNodes].forEach(parseNode);
-    }
-
-    // ══════════════════════════════════════════════════
-    // BUILD PDF
-    // ══════════════════════════════════════════════════
-
-    // ── Cover page ────────────────────────────────────
-    pdf.setFillColor(11,15,26);
-    pdf.rect(0,0,PW,PH,'F');
-
-    // Gold decorative line top
-    pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.8);
-    pdf.line(ML,28,PW-MR,28);
-
-    setFont('normal',11,[201,168,76]);
-    pdf.text('✦  ASTRO PRO  ✦',PW/2,42,{align:'center'});
-
-    setFont('bold',22,[201,168,76]);
-    const nameLines=pdf.splitTextToSize(name.toUpperCase(),TW);
-    nameLines.forEach((l,i)=>{pdf.text(l,PW/2,58+i*11,{align:'center'});});
-
-    setFont('normal',10,[148,163,184]);
-    pdf.text(`${date}  ·  ${time}  ·  ${birth}`,PW/2,78,{align:'center'});
-    if(reloc) pdf.text(`Relokacja: ${reloc}`,PW/2,85,{align:'center'});
-
-    setFont('italic',9,[100,116,139]);
-    pdf.text(`Pełna Analiza Psychologiczno-Ewolucyjna ${yr}`,PW/2,96,{align:'center'});
-
-    pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.8);
-    pdf.line(ML,103,PW-MR,103);
-
-    // Planet summary on cover
-    y=115;
-    setFont('bold',8,[201,168,76]);
-    pdf.text('DANE HOROSKOPU',PW/2,y,{align:'center'}); y+=7;
-
-    const coverPlanets=Object.entries(p).slice(0,8);
-    coverPlanets.forEach(([k,v],i)=>{
-      const col=i%2;
-      const row=Math.floor(i/2);
-      const cx=ML+(col*(TW/2));
-      setFont('bold',8,[148,163,184]);
-      pdf.text(PLANET_PL[k]||k,cx,y+row*7);
-      setFont('normal',8,[226,232,240]);
-      pdf.text(`${v.deg}° ${v.sign}${v.house?' Dom '+v.house:''}`,cx+22,y+row*7);
-    });
-    y+=Math.ceil(coverPlanets.length/2)*7+8;
-
-    // Footer cover
-    setFont('normal',8,[71,85,105]);
-    pdf.text(`Obliczenia: Swiss Ephemeris  ·  Silnik Aspektów  ·  ${aspects.length} aspektów`,PW/2,PH-14,{align:'center'});
-    pdf.text('silentmichal.github.io/astro',PW/2,PH-9,{align:'center'});
-
-    // ── Page 2: planet table + aspects ───────────────
-    pdf.addPage(); y=MT;
-    pdf.setFillColor(255,255,255);
-
-    addH1('Dane Surowe Horoskopu');
-    y+=2;
-
-    // Planet table
-    addH2('Pozycje Planet');
-    const ptmp=document.createElement('table');
-    ptmp.innerHTML=`<thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th><th>Żywioł</th></tr></thead><tbody>`+
-      Object.entries(p).map(([k,v])=>`<tr><td>${PLANET_PL[k]||k}</td><td>${v.sym} ${v.sign}</td><td>${v.deg}°${v.min}'</td><td>${v.house?'Dom '+v.house:'—'}</td><td>${v.elementName||''}</td></tr>`).join('')+
-      `</tbody>`;
-    addTable(ptmp);
-
-    checkPage(20);
-    addH2('Aspekty Planetarne');
-    aspects.slice(0,20).forEach(a=>{
-      checkPage(6);
-      setFont('normal',9,[30,41,59]);
-      const natCol=a.asp.nature==='harmony'?[16,185,129]:a.asp.nature==='tension'?[239,68,68]:[148,163,184];
-      pdf.setTextColor(...natCol);
-      pdf.text(a.asp.sym,ML,y);
-      pdf.setTextColor(30,41,59);
-      pdf.text(`${PLANET_PL[a.p1]}  ${a.asp.name}  ${PLANET_PL[a.p2]}`,ML+6,y);
-      pdf.setTextColor(148,163,184);
-      pdf.text(`orba ${a.orb}°`,PW-MR-18,y);
-      y+=5.5;
+    btn.textContent='⏳ Generuję PDF…';
+    const res=await fetch('/api/pdf',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
     });
 
-    // ── Pages 3+: AI report ───────────────────────────
-    pdf.addPage(); y=MT;
-    pdf.setFillColor(255,255,255);
-
-    setFont('bold',14,[201,168,76]);
-    pdf.text('PEŁNA ANALIZA ASTROLOGICZNA',PW/2,y,{align:'center'}); y+=6;
-    setFont('normal',9,[100,116,139]);
-    pdf.text(name,PW/2,y,{align:'center'}); y+=10;
-    drawLine([201,168,76],0.5);
-
-    // Parse report HTML
-    const tmp=document.createElement('div');
-    tmp.innerHTML=STATE.reportHtml;
-    [...tmp.childNodes].forEach(parseNode);
-
-    // ── Footer on every page ──────────────────────────
-    const totalPages=pdf.internal.getNumberOfPages();
-    for(let i=1;i<=totalPages;i++){
-      pdf.setPage(i);
-      pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.2);
-      pdf.line(ML,PH-12,PW-MR,PH-12);
-      setFont('normal',7.5,[148,163,184]);
-      pdf.text('AstroPro · Profesjonalna Analiza Astrologiczna',ML,PH-7);
-      pdf.text(`${i} / ${totalPages}`,PW-MR,PH-7,{align:'right'});
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      throw new Error(err.error||'Błąd serwera PDF: '+res.status);
     }
 
-    pdf.save(`AstroPro_${name.replace(/\s+/g,'_')}_${date}.pdf`);
+    // Download the PDF blob
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`AstroPro_${name.replace(/\s+/g,'_')}_${date}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-  }catch(e){ alert('Błąd PDF: '+e.message+'\n'+e.stack); }
+  }catch(e){ alert('Błąd PDF: '+e.message); }
   finally{ btn.textContent='⬇ PDF'; btn.disabled=false; }
 }
+// ══════════════════════════════════════════════════
 // ══════════════════════════════════════════════════
 // WORD (.docx) — generowanie przez HTML blob
 // ══════════════════════════════════════════════════

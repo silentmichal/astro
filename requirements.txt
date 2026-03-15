@@ -1,3 +1,4 @@
 pyswisseph==2.10.3.2
 timezonefinder==6.2.0
 pytz==2023.3
+weasyprint==60.2
