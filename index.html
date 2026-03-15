@@ -258,6 +258,7 @@ input::placeholder{color:var(--text3)}
   <div class="report-toolbar">
     <h2 id="report-title">Analiza Astrologiczna</h2>
     <button class="btn-sm btn-outline" onclick="showMain('data')">← Dane</button>
+    <button class="btn-sm btn-outline" id="word-btn" onclick="downloadWord()" style="border-color:rgba(59,130,246,.4);color:#60a5fa">⬇ Word</button>
     <button class="btn-sm btn-gold" id="pdf-btn" onclick="downloadPDF()">⬇ PDF</button>
   </div>
   <div class="report-meta" id="report-meta"></div>
@@ -1049,6 +1050,124 @@ async function downloadPDF(){
   }catch(e){ alert('Błąd PDF: '+e.message+'\n'+e.stack); }
   finally{ btn.textContent='⬇ PDF'; btn.disabled=false; }
 }
+// ══════════════════════════════════════════════════
+// WORD (.docx) — generowanie przez HTML blob
+// ══════════════════════════════════════════════════
+function downloadWord(){
+  const btn=document.getElementById('word-btn');
+  btn.textContent='⏳…'; btn.disabled=true;
+  try{
+    const{formData,chart,aspects,reportHtml}=STATE;
+    const{name,date,time,birth,reloc}=formData;
+    const p=chart.planets;
+    const yr=new Date().getFullYear();
+    const monthYear=new Date().toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+
+    // Build planet table HTML
+    const planetRows=Object.entries(p).map(([k,v])=>
+      `<tr><td>${PLANET_PL[k]||k}</td><td>${v.sym} ${v.sign}</td><td>${v.deg}°${v.min}'</td><td>${v.house?'Dom '+v.house:'—'}</td><td>${v.elementName||''}</td></tr>`
+    ).join('');
+
+    // Build aspects HTML
+    const aspectRows=aspects.slice(0,20).map(a=>
+      `<tr><td>${a.asp.sym} ${a.asp.name}</td><td>${PLANET_PL[a.p1]}</td><td>${PLANET_PL[a.p2]}</td><td>${a.orb}°</td><td>${a.asp.nature==='harmony'?'Harmonijny':a.asp.nature==='tension'?'Napięciowy':'Neutralny'}</td></tr>`
+    ).join('');
+
+    // Clean report HTML for Word (remove dark-theme classes)
+    const cleanReport=reportHtml
+      .replace(/class="[^"]*"/g,'')
+      .replace(/style="[^"]*"/g,'');
+
+    const html=`
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<title>AstroPro — ${name}</title>
+<!--[if gte mso 9]>
+<xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+<![endif]-->
+<style>
+  @page { margin: 2.5cm 2.8cm; }
+  body { font-family: Georgia, serif; font-size: 11pt; color: #1e293b; line-height: 1.7; }
+  .cover { text-align: center; padding: 60pt 0 40pt; border-bottom: 2pt solid #c9a84c; margin-bottom: 30pt; page-break-after: always; }
+  .cover-glyph { font-size: 20pt; color: #c9a84c; margin-bottom: 12pt; }
+  .cover-title { font-size: 22pt; color: #7a5c10; letter-spacing: 3pt; font-weight: bold; margin-bottom: 10pt; }
+  .cover-sub { font-size: 11pt; color: #64748b; font-style: italic; margin: 4pt 0; }
+  .cover-yr { font-size: 10pt; color: #94a3b8; margin-top: 12pt; }
+  h1 { font-family: Georgia, serif; font-size: 16pt; color: #c9a84c; text-align: center; letter-spacing: 2pt; margin: 20pt 0 6pt; }
+  h2 { font-family: Georgia, serif; font-size: 13pt; color: #1e3a8a; font-weight: bold; margin: 24pt 0 8pt; padding-bottom: 4pt; border-bottom: 1pt solid #c9a84c; page-break-before: always; }
+  h2:first-of-type { page-break-before: avoid; }
+  h3 { font-family: Georgia, serif; font-size: 11pt; color: #7a5c10; font-weight: bold; margin: 14pt 0 5pt; text-transform: uppercase; letter-spacing: 0.5pt; }
+  p { margin: 0 0 8pt; }
+  ul, ol { margin: 6pt 0 8pt 20pt; }
+  li { margin-bottom: 4pt; }
+  strong { color: #1e3a8a; }
+  table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 10pt; }
+  th { background: #1e3a8a; color: #c9a84c; padding: 6pt 8pt; text-align: left; font-size: 9pt; letter-spacing: 0.5pt; }
+  td { padding: 5pt 8pt; border-bottom: 0.5pt solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td:first-child { color: #1e3a8a; font-weight: bold; }
+  .section-data { page-break-before: always; }
+  .footer-note { text-align: center; margin-top: 30pt; padding-top: 10pt; border-top: 0.5pt solid #e2e8f0; color: #94a3b8; font-size: 9pt; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-glyph">✦ ASTRO PRO ✦</div>
+  <div class="cover-title">${name.toUpperCase()}</div>
+  <div class="cover-sub">${date} · ${time} · ${birth}</div>
+  ${reloc?`<div class="cover-sub">Relokacja: ${reloc}</div>`:''}
+  <div class="cover-yr">Pełna Analiza Psychologiczno-Ewolucyjna ${yr}</div>
+</div>
+
+<div class="section-data">
+<h1>Dane Horoskopu</h1>
+<h2>Pozycje Planet</h2>
+<table>
+  <thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th><th>Żywioł</th></tr></thead>
+  <tbody>${planetRows}</tbody>
+</table>
+
+<h2>Aspekty Planetarne</h2>
+<table>
+  <thead><tr><th>Aspekt</th><th>Planeta 1</th><th>Planeta 2</th><th>Orba</th><th>Natura</th></tr></thead>
+  <tbody>${aspectRows}</tbody>
+</table>
+</div>
+
+<h1>Pełna Analiza Astrologiczna</h1>
+<h3>${name}</h3>
+
+${cleanReport}
+
+<div class="footer-note">
+  ✦ AstroPro — Profesjonalna Analiza Astrologiczna ✦<br>
+  Wygenerowano: ${monthYear} · Obliczenia: VSOP87 ±0.5° · Silnik Aspektów<br>
+  silentmichal.github.io/astro
+</div>
+
+</body>
+</html>`;
+
+    // Download as .doc (Word-compatible HTML)
+    const blob=new Blob([html],{type:'application/msword;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`AstroPro_${name.replace(/\s+/g,'_')}_${date}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+  }catch(e){ alert('Błąd Word: '+e.message); }
+  finally{ btn.textContent='⬇ Word'; btn.disabled=false; }
+}
+
 </script>
 </body>
 </html>
