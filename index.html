@@ -458,7 +458,8 @@ function showMain(panel){
 function setStep(n){
   for(let i=1;i<=4;i++){
     const el=document.getElementById('st'+i);
-    if(i<n){el.className='step done';el.innerHTML='✓ '+el.textContent.replace('✓ ','');}
+    if(!el) continue;
+    if(i<n){el.className='step done';}
     else if(i===n){el.className='step active';}
     else{el.className='step';}
   }
