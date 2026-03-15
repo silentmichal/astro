@@ -148,7 +148,7 @@ input::placeholder{color:var(--text3)}
     <div class="logo-text">ASTRO PRO</div>
     <div class="logo-sub">Professional Chart Analysis Engine</div>
   </div>
-  <div class="header-badge" onclick="showApiKeyPanel()" style="cursor:pointer" title="Zmień klucz API" id="key-badge">🔑 API Key</div>
+  <div class="header-badge">v3.0 PRO · Swiss Ephemeris</div>
 </div>
 
 <!-- TABS (top-level) -->
@@ -156,27 +156,6 @@ input::placeholder{color:var(--text3)}
   <button class="tab active" onclick="showMain('input')">① Dane Wejściowe</button>
   <button class="tab" onclick="showMain('data')" id="tab-data" style="opacity:.4;pointer-events:none">② Surowe Dane & Aspekty</button>
   <button class="tab" onclick="showMain('report')" id="tab-report" style="opacity:.4;pointer-events:none">③ Raport AI</button>
-</div>
-
-<!-- ═══ API KEY SETUP ═══ -->
-<div id="panel-apikey" style="display:none">
-  <div class="card" style="max-width:480px;margin:0 auto">
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="font-size:32px;margin-bottom:10px">🔑</div>
-      <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:1px;margin-bottom:8px">Klucz API Anthropic</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.7">Klucz jest zapisywany <strong style="color:var(--text)">wyłącznie lokalnie</strong> w Twojej przeglądarce.<br>Nigdy nie jest wysyłany nigdzie poza Anthropic API.</div>
-    </div>
-    <label>Twój klucz API (sk-ant-...)</label>
-    <div style="position:relative">
-      <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." style="padding-right:44px">
-      <button onclick="toggleKeyVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px" id="eye-btn">👁</button>
-    </div>
-    <div style="margin-top:8px;font-size:11px;color:var(--text3)">
-      Klucz znajdziesz na: <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--gold);text-decoration:none">console.anthropic.com/settings/keys</a>
-    </div>
-    <button class="btn-primary" onclick="saveApiKey()">✓ Zapisz i Przejdź Dalej</button>
-    <div id="key-err" class="alert alert-error" style="margin-top:8px"></div>
-  </div>
 </div>
 
 <!-- ═══ PANEL 1: INPUT ═══ -->
@@ -272,53 +251,7 @@ input::placeholder{color:var(--text3)}
 
 <script>
 // ══════════════════════════════════════════════════
-// API KEY MANAGEMENT
-// ══════════════════════════════════════════════════
-function getApiKey(){ return localStorage.getItem('astropro_key')||''; }
-function setApiKey(k){ localStorage.setItem('astropro_key',k); }
-
-function showApiKeyPanel(){
-  document.getElementById('panel-apikey').style.display='block';
-  document.getElementById('panel-input').style.display='none';
-  document.getElementById('main-tabs').style.display='none';
-  const k=getApiKey();
-  if(k) document.getElementById('api-key-input').value=k;
-}
-
-function saveApiKey(){
-  const k=document.getElementById('api-key-input').value.trim();
-  const errEl=document.getElementById('key-err');
-  if(!k.startsWith('sk-ant-')){
-    errEl.textContent='Klucz musi zaczynać się od "sk-ant-"';
-    errEl.style.display='block';
-    return;
-  }
-  setApiKey(k);
-  errEl.style.display='none';
-  document.getElementById('panel-apikey').style.display='none';
-  document.getElementById('panel-input').style.display='block';
-  document.getElementById('main-tabs').style.display='flex';
-  document.getElementById('key-badge').textContent='🔑 ✓';
-  document.getElementById('key-badge').style.color='var(--green)';
-}
-
-function toggleKeyVisibility(){
-  const inp=document.getElementById('api-key-input');
-  inp.type=inp.type==='password'?'text':'password';
-}
-
-// INIT — show key panel if no key saved
-window.addEventListener('DOMContentLoaded',()=>{
-  if(!getApiKey()){
-    showApiKeyPanel();
-  } else {
-    document.getElementById('key-badge').textContent='🔑 ✓';
-    document.getElementById('key-badge').style.color='var(--green)';
-  }
-});
-
-// ══════════════════════════════════════════════════
-// CONSTANTS (still needed for rendering/PDF)
+// CONSTANTS (potrzebne do renderowania/PDF)
 // ══════════════════════════════════════════════════
 const SIGNS=["Baran","Byk","Bliźnięta","Rak","Lew","Panna","Waga","Skorpion","Strzelec","Koziorożec","Wodnik","Ryby"];
 const SIGN_SYM=["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
@@ -555,28 +488,17 @@ ASPEKTY: ${aspLines}`;
 // SINGLE SECTION API CALL
 // ══════════════════════════════════════════════════
 async function callSection(prompt) {
-  const key = getApiKey();
-  if(!key) throw new Error('Brak klucza API. Kliknij 🔑 w nagłówku.');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/api/report', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000,
-      messages: [{role: 'user', content: prompt}]
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
   });
   if (!res.ok) {
-    const err = await res.json().catch(()=>({}));
-    throw new Error(err?.error?.message || 'API error ' + res.status);
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Błąd serwera: ' + res.status);
   }
   const data = await res.json();
-  return data.content?.[0]?.text || '';
+  return data.text || '';
 }
 
 // ══════════════════════════════════════════════════
