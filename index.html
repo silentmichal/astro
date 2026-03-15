@@ -263,18 +263,17 @@ const PLANET_PL={sun:"Słońce",moon:"Księżyc",mercury:"Merkury",venus:"Wenus"
 // ══════════════════════════════════════════════════
 // SWISS EPHEMERIS API (Vercel /api/chart)
 // ══════════════════════════════════════════════════
-async function fetchChart(date, time, lat, lon) {
+async function fetchChart(date, time, lat, lon, cityName) {
   const res = await fetch('/api/chart', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, time, lat, lon })
+    body: JSON.stringify({ date, time, lat, lon, city_name: cityName || '' })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error('API obliczeniowe: ' + (err.error || res.status));
   }
   const data = await res.json();
-  // Normalize: ensure rawDeg exists (frontend uses it for aspects)
   Object.keys(data.planets).forEach(k => {
     if (data.planets[k]) data.planets[k].rawDeg = data.planets[k].raw;
   });
@@ -527,9 +526,15 @@ async function startPipeline(){
 
     // Steps 1-3: calculations via Swiss Ephemeris API
     setStep(1); await sleep(200); setStep(2);
-    document.getElementById('load-title').textContent = 'OBLICZAM HOROSKOP…'; document.getElementById('st1').textContent = '① Swiss Ephemeris + strefa czasowa'; document.getElementById('st2').textContent = '② Pozycje planet (Placidus)';
-    const chart = await fetchChart(date, time, coords[0], coords[1]);
+    document.getElementById('load-title').textContent = 'OBLICZAM HOROSKOP…';
+    document.getElementById('st1').textContent = '① Geokodowanie miasta (OpenStreetMap)';
+    document.getElementById('st2').textContent = '② Swiss Ephemeris + Placidus';
+    const chart = await fetchChart(date, time, coords[0], coords[1], birth);
     STATE.chart = chart;
+    // Show resolved city coords in step label
+    if(chart.geo_resolved){
+      document.getElementById('st2').textContent = `② ${chart.lat_used.toFixed(4)}°N ${chart.lon_used.toFixed(4)}°E`;
+    }
     await sleep(200);
 
     setStep(3);
