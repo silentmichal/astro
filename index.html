@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroPro — Analiza Horoskopu</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cinzel:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0f1a;--surface:#111827;--surface2:#1a2235;--surface3:#1f2b42;
+  --border:#1e2d45;--border2:#2a3a55;
+  --gold:#c9a84c;--gold2:#e8c96d;--gold-dim:#7a5c1e;
+  --indigo:#6366f1;--indigo2:#818cf8;
+  --slate:#94a3b8;--slate2:#64748b;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#475569;
+  --green:#10b981;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;--orange:#f97316;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
+/* ── Layout ── */
+.app{max-width:1100px;margin:0 auto;padding:24px 16px}
+/* ── Header ── */
+.app-header{display:flex;align-items:center;gap:14px;padding:20px 0 28px;border-bottom:1px solid var(--border);margin-bottom:28px}
+.logo-mark{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dim),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-text{font-family:'Cinzel',serif;font-size:18px;color:var(--gold);letter-spacing:2px}
+.logo-sub{font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+.header-badge{margin-left:auto;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--slate);letter-spacing:1px}
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:24px}
+.tab{flex:1;padding:8px 12px;border:none;background:transparent;color:var(--text2);font-family:'Inter',sans-serif;font-size:12px;letter-spacing:.5px;cursor:pointer;border-radius:7px;transition:all .2s;text-transform:uppercase}
+.tab.active{background:var(--surface3);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-title{font-family:'Cinzel',serif;font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border2)}
+/* ── Form grid ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px}
+label{display:block;font-size:10px;letter-spacing:1.5px;color:var(--slate2);text-transform:uppercase;margin-bottom:5px}
+input,select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s;font-family:'Inter',sans-serif;-webkit-appearance:none}
+input:focus,select:focus{border-color:var(--gold-dim);background:var(--surface3)}
+input::placeholder{color:var(--text3)}
+/* ── Button ── */
+.btn-primary{width:100%;margin-top:16px;padding:13px;background:linear-gradient(135deg,#5a4010,var(--gold),#7a5c10);border:none;border-radius:8px;color:#070714;font-family:'Cinzel',serif;font-size:12px;letter-spacing:2px;cursor:pointer;font-weight:600;transition:opacity .2s}
+.btn-primary:hover{opacity:.9}
+.btn-primary:disabled{opacity:.5;cursor:wait}
+.btn-sm{padding:7px 14px;border-radius:6px;font-size:11px;letter-spacing:.5px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-outline:hover{border-color:var(--gold-dim);color:var(--gold)}
+.btn-gold{background:linear-gradient(135deg,#5a4010,var(--gold));border:none;color:#070714;font-weight:600}
+.btn-gold:disabled{opacity:.5;cursor:wait}
+/* ── Error ── */
+.alert{margin-top:10px;padding:10px 12px;border-radius:7px;font-size:12px;display:none}
+.alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+/* ── Loading ── */
+.loading-screen{display:none;text-align:center;padding:80px 20px}
+.spinner{width:52px;height:52px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--gold);animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-steps{display:flex;flex-direction:column;gap:8px;max-width:320px;margin:20px auto 0}
+.step{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:7px;background:var(--surface);font-size:12px;color:var(--text2)}
+.step.active{border:1px solid var(--gold-dim);color:var(--gold)}
+.step.done{color:var(--green)}
+/* ── Data Table ── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{background:var(--surface2);color:var(--gold);padding:7px 10px;text-align:left;font-weight:500;font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border2)}
+.data-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+.data-table tr:hover td{background:var(--surface2)}
+.planet-name{color:var(--text);font-weight:500}
+.sign-badge{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:500}
+.house-num{color:var(--indigo2);font-weight:600}
+/* ── Aspects ── */
+.aspects-grid{display:grid;gap:6px}
+.aspect-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:7px;font-size:12px}
+.aspect-symbol{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.asp-con{background:rgba(99,102,241,.2);color:var(--indigo2)}
+.asp-tri{background:rgba(16,185,129,.2);color:var(--green)}
+.asp-sxt{background:rgba(59,130,246,.2);color:var(--blue)}
+.asp-squ{background:rgba(239,68,68,.2);color:var(--red)}
+.asp-opp{background:rgba(249,115,22,.2);color:var(--orange)}
+.asp-qui{background:rgba(168,85,247,.2);color:var(--purple)}
+.aspect-planets{color:var(--text);font-weight:500;flex:1}
+.aspect-orb{color:var(--text3);font-size:11px;margin-left:auto}
+.aspect-nature{font-size:10px;padding:2px 6px;border-radius:3px;margin-left:4px}
+.nat-harmony{background:rgba(16,185,129,.15);color:var(--green)}
+.nat-tension{background:rgba(239,68,68,.15);color:var(--red)}
+.nat-neutral{background:rgba(148,163,184,.1);color:var(--slate)}
+/* ── Report ── */
+.report-toolbar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.report-toolbar h2{font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:1px;margin-right:auto}
+.report-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:20px}
+.meta-chip{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px}
+.meta-chip .label{font-size:9px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:3px}
+.meta-chip .value{font-size:13px;color:var(--text);font-weight:500}
+.meta-chip .sub{font-size:11px;color:var(--slate2)}
+/* ── Report body ── */
+.report-content h2{font-family:'Cinzel',serif;color:var(--gold);font-size:14px;font-weight:400;letter-spacing:1px;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px}
+.report-content h2 .sec-num{background:var(--gold-dim);color:var(--gold2);width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.report-content h3{font-size:12px;font-weight:600;color:var(--indigo2);letter-spacing:.5px;margin:18px 0 7px;text-transform:uppercase}
+.report-content p{color:var(--text2);line-height:1.8;margin-bottom:10px;font-size:14px}
+.report-content strong{color:var(--text)}
+.report-content ul,.report-content ol{color:var(--text2);padding-left:18px;margin:8px 0}
+.report-content li{margin-bottom:5px;line-height:1.7;font-size:13px}
+.report-content table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
+.report-content th{background:var(--surface2);color:var(--gold);padding:8px 10px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border2)}
+.report-content td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+.report-content td:first-child{color:var(--text);font-weight:500}
+.report-content tr:hover td{background:var(--surface2)}
+/* ── Section panels ── */
+.section-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px}
+/* ── Stats bar ── */
+.stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex:1;min-width:100px}
+.stat .n{font-size:20px;font-weight:600;color:var(--gold)}
+.stat .l{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+/* ── Sign colors ── */
+.fire{color:#ef4444}.earth{color:#22c55e}.air{color:#60a5fa}.water{color:#a78bfa}
+/* ── Responsive ── */
+@media(max-width:600px){.form-grid{grid-template-columns:1fr 1fr}.stats-bar{gap:8px}.stat{min-width:80px}}
+/* ── PDF hidden container ── */
+#pdf-stage{position:absolute;left:0;top:0;width:800px;background:#fff;color:#1e293b;font-family:Georgia,serif;padding:50px 55px;font-size:11.5pt;line-height:1.75;visibility:hidden;z-index:-1}
+#pdf-stage h1{font-family:Georgia,serif;color:#7a5c10;font-size:20pt;text-align:center;letter-spacing:2px;margin-bottom:6px}
+#pdf-stage .pdf-cover-sub{text-align:center;color:#64748b;font-style:italic;margin-bottom:4px;font-size:11pt}
+#pdf-stage .pdf-divider{border:none;border-top:2px solid #c9a84c;margin:20px 0}
+#pdf-stage h2{font-family:Georgia,serif;color:#1e3a5f;font-size:13pt;font-weight:bold;margin:28px 0 10px;padding-bottom:5px;border-bottom:1.5px solid #c9a84c}
+#pdf-stage h3{font-family:Georgia,serif;color:#7a5c10;font-size:11pt;font-weight:bold;margin:16px 0 6px}
+#pdf-stage p{margin-bottom:9px;color:#1e293b}
+#pdf-stage ul,#pdf-stage ol{padding-left:20px;margin:6px 0}
+#pdf-stage li{margin-bottom:4px}
+#pdf-stage strong{color:#1e3a5f}
+#pdf-stage table{width:100%;border-collapse:collapse;margin:10px 0;font-size:10pt}
+#pdf-stage th{background:#1e3a5f;color:#c9a84c;padding:6px 9px;text-align:left;font-size:9pt;letter-spacing:.5px}
+#pdf-stage td{padding:6px 9px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+#pdf-stage tr:nth-child(even) td{background:#f8fafc}
+#pdf-stage td:first-child{color:#1e3a5f;font-weight:bold}
+#pdf-stage .pdf-aspects{margin:12px 0}
+#pdf-stage .pdf-aspect-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:10pt}
+#pdf-stage .pdf-aspect-sym{font-weight:bold;width:20px}
+#pdf-stage .pdf-footer{text-align:center;margin-top:40px;color:#94a3b8;font-style:italic;font-size:9pt;padding-top:12px;border-top:1px solid #e2e8f0}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="logo-mark">✦</div>
+  <div>
+    <div class="logo-text">ASTRO PRO</div>
+    <div class="logo-sub">Professional Chart Analysis Engine</div>
+  </div>
+  <div class="header-badge" onclick="showApiKeyPanel()" style="cursor:pointer" title="Zmień klucz API" id="key-badge">🔑 API Key</div>
+</div>
+
+<!-- TABS (top-level) -->
+<div class="tabs" id="main-tabs">
+  <button class="tab active" onclick="showMain('input')">① Dane Wejściowe</button>
+  <button class="tab" onclick="showMain('data')" id="tab-data" style="opacity:.4;pointer-events:none">② Surowe Dane & Aspekty</button>
+  <button class="tab" onclick="showMain('report')" id="tab-report" style="opacity:.4;pointer-events:none">③ Raport AI</button>
+</div>
+
+<!-- ═══ API KEY SETUP ═══ -->
+<div id="panel-apikey" style="display:none">
+  <div class="card" style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:32px;margin-bottom:10px">🔑</div>
+      <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:1px;margin-bottom:8px">Klucz API Anthropic</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">Klucz jest zapisywany <strong style="color:var(--text)">wyłącznie lokalnie</strong> w Twojej przeglądarce.<br>Nigdy nie jest wysyłany nigdzie poza Anthropic API.</div>
+    </div>
+    <label>Twój klucz API (sk-ant-...)</label>
+    <div style="position:relative">
+      <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." style="padding-right:44px">
+      <button onclick="toggleKeyVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px" id="eye-btn">👁</button>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+      Klucz znajdziesz na: <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--gold);text-decoration:none">console.anthropic.com/settings/keys</a>
+    </div>
+    <button class="btn-primary" onclick="saveApiKey()">✓ Zapisz i Przejdź Dalej</button>
+    <div id="key-err" class="alert alert-error" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 1: INPUT ═══ -->
+<div id="panel-input">
+  <div class="card">
+    <div class="card-title">Dane Urodzeniowe</div>
+    <div class="form-grid">
+      <div><label>Imię i Nazwisko *</label><input id="f-name" placeholder="Jan Kowalski"></div>
+      <div><label>Data Urodzenia *</label><input id="f-date" type="date"></div>
+      <div><label>Godzina Urodzenia *</label><input id="f-time" type="time"></div>
+      <div><label>Miasto Urodzenia *</label><input id="f-birth" placeholder="np. Kościerzyna"></div>
+      <div><label>Relokacja / Obecne Miasto</label><input id="f-reloc" placeholder="np. Larvik (opcjonalne)"></div>
+      <div><label>Język Raportu</label>
+        <select id="f-lang">
+          <option value="pl">Polski</option>
+          <option value="en">English</option>
+          <option value="no">Norsk</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-primary" id="gen-btn" onclick="startPipeline()">⬡ OBLICZ I GENERUJ RAPORT</button>
+    <div id="err-msg" class="alert alert-error"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div class="card" style="text-align:center">
+      <div style="font-size:22px;color:var(--gold);margin-bottom:4px">⊙</div>
+      <div style="font-size:11px;color:var(--text3)">Precyzja obliczeń</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">VSOP87 ±0.5°</div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:22px;color:var(--indigo2);margin-bottom:4px">⚹</div>
+      <div style="font-size:11px;color:var(--text3)">Aspekty</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">6 typów + orby</div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:22px;color:var(--green);margin-bottom:4px">✎</div>
+      <div style="font-size:11px;color:var(--text3)">Raport AI</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">12 sekcji · ~4 min</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:10px;display:flex;gap:12px;align-items:flex-start">
+    <div style="font-size:20px;flex-shrink:0">🌐</div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">Czy można to uruchomić jako webapp?</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">To narzędzie działa jako samodzielny plik HTML — można je hostować na <strong style="color:var(--gold)">GitHub Pages, Netlify lub Vercel</strong> bezpłatnie. Dla wersji płatnej (klientów) zalecane jest dodanie <strong style="color:var(--gold)">backendu proxy</strong> (np. Cloudflare Worker), który przechowuje klucz API po stronie serwera. Wówczas klienci nie widzą klucza, a Ty kontrolujesz dostęp i liczysz użycia.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LOADING ═══ -->
+<div class="loading-screen" id="loading-screen">
+  <div class="spinner"></div>
+  <div style="color:var(--gold);font-family:'Cinzel',serif;font-size:14px;letter-spacing:2px" id="load-title">OBLICZANIE</div>
+  <div class="loading-steps">
+    <div class="step" id="st1">① Obliczanie Julianische Tagesnummer</div>
+    <div class="step" id="st2">② Pozycje planet VSOP87</div>
+    <div class="step" id="st3">③ Obliczanie aspektów (wszystkie pary)</div>
+    <div class="step" id="st4">④ Generowanie raportu AI — 12 sekcji…</div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 2: RAW DATA ═══ -->
+<div id="panel-data" style="display:none">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px" id="summary-stats"></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+    <div class="card">
+      <div class="card-title">Pozycje Planet</div>
+      <table class="data-table" id="planet-table"></table>
+    </div>
+    <div class="card">
+      <div class="card-title">Aspekty Planetarne</div>
+      <div class="aspects-grid" id="aspects-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 3: REPORT ═══ -->
+<div id="panel-report" style="display:none">
+  <div class="report-toolbar">
+    <h2 id="report-title">Analiza Astrologiczna</h2>
+    <button class="btn-sm btn-outline" onclick="showMain('data')">← Dane</button>
+    <button class="btn-sm btn-gold" id="pdf-btn" onclick="downloadPDF()">⬇ PDF</button>
+  </div>
+  <div class="report-meta" id="report-meta"></div>
+  <div class="section-panel report-content" id="report-body"></div>
+</div>
+
+</div><!-- /app -->
+
+<!-- PDF STAGE -->
+<div id="pdf-stage"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+// API KEY MANAGEMENT
+// ══════════════════════════════════════════════════
+function getApiKey(){ return localStorage.getItem('astropro_key')||''; }
+function setApiKey(k){ localStorage.setItem('astropro_key',k); }
+
+function showApiKeyPanel(){
+  document.getElementById('panel-apikey').style.display='block';
+  document.getElementById('panel-input').style.display='none';
+  document.getElementById('main-tabs').style.display='none';
+  const k=getApiKey();
+  if(k) document.getElementById('api-key-input').value=k;
+}
+
+function saveApiKey(){
+  const k=document.getElementById('api-key-input').value.trim();
+  const errEl=document.getElementById('key-err');
+  if(!k.startsWith('sk-ant-')){
+    errEl.textContent='Klucz musi zaczynać się od "sk-ant-"';
+    errEl.style.display='block';
+    return;
+  }
+  setApiKey(k);
+  errEl.style.display='none';
+  document.getElementById('panel-apikey').style.display='none';
+  document.getElementById('panel-input').style.display='block';
+  document.getElementById('main-tabs').style.display='flex';
+  document.getElementById('key-badge').textContent='🔑 ✓';
+  document.getElementById('key-badge').style.color='var(--green)';
+}
+
+function toggleKeyVisibility(){
+  const inp=document.getElementById('api-key-input');
+  inp.type=inp.type==='password'?'text':'password';
+}
+
+// INIT — show key panel if no key saved
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!getApiKey()){
+    showApiKeyPanel();
+  } else {
+    document.getElementById('key-badge').textContent='🔑 ✓';
+    document.getElementById('key-badge').style.color='var(--green)';
+  }
+});
+
+// ══════════════════════════════════════════════════
+// MATH & ASTRONOMY
+// ══════════════════════════════════════════════════
+const R=d=>d*Math.PI/180,D=r=>r*180/Math.PI,N=a=>((a%360)+360)%360;
+
+function julianDay(yr,mo,dy,hr){
+  if(mo<=2){yr--;mo+=12;}
+  const A=Math.floor(yr/100),B=2-A+Math.floor(A/4);
+  return Math.floor(365.25*(yr+4716))+Math.floor(30.6001*(mo+1))+dy+hr/24+B-1524.5;
+}
+function sunLon(J){
+  const T=(J-2451545)/36525,L0=280.46646+36000.76983*T+0.0003032*T*T;
+  const M=R(357.52911+35999.05029*T-0.0001537*T*T);
+  const C=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(M)+(0.019993-0.000101*T)*Math.sin(2*M)+0.000289*Math.sin(3*M);
+  return N(L0+C);
+}
+function moonLon(J){
+  const T=(J-2451545)/36525,Lm=218.3165+481267.8813*T;
+  const Mm=R(134.9634+477198.8676*T),Dr=R(297.8502+445267.1115*T),Fr=R(93.2721+483202.0175*T),Mr=R(357.5291+35999.0503*T);
+  return N(Lm+6.2888*Math.sin(Mm)+1.274*Math.sin(2*Dr-Mm)+0.6583*Math.sin(2*Dr)+0.2136*Math.sin(2*Mm)-0.1851*Math.sin(Mr)-0.1143*Math.sin(2*Fr)+0.0533*Math.sin(2*Dr+Mm)+0.0572*Math.sin(2*Dr-Mr-Mm)+0.0588*Math.sin(2*Dr-2*Mm));
+}
+function outerLon(J,L0,Lr){return N(L0+(J-2451545)/36525*Lr);}
+function innerLon(J,L0,Lr){
+  const T=(J-2451545)/36525,hLon=N(L0+T*Lr),s=sunLon(J),diff=R(hLon-s),r=Lr>100000?0.387:0.723;
+  return N(D(Math.atan2(r*Math.sin(diff),r*Math.cos(diff)+1))+s);
+}
+function nodeLon(J){return N(125.0445-(J-2451545)/36525*1934.1363);}
+function calcAsc(J,lat,lon){
+  const T=(J-2451545)/36525,GMST=N(280.46061837+360.98564736629*(J-2451545)),LST=R(N(GMST+lon)),eps=R(23.4393-0.013*T);
+  const A=N(D(Math.atan2(-Math.cos(LST),Math.sin(LST)*Math.cos(eps)+Math.tan(R(lat))*Math.sin(eps))));
+  return Math.sin(LST)<0?N(A+180):A;
+}
+function calcMC(J,lon){
+  const T=(J-2451545)/36525,GMST=N(280.46061837+360.98564736629*(J-2451545)),LST=R(N(GMST+lon)),eps=R(23.4393-0.013*T);
+  return N(D(Math.atan2(Math.cos(LST),-Math.sin(LST)*Math.cos(eps))));
+}
+
+// ── Signs ──────────────────────────────────────────
+const SIGNS=["Baran","Byk","Bliźnięta","Rak","Lew","Panna","Waga","Skorpion","Strzelec","Koziorożec","Wodnik","Ryby"];
+const SIGN_SYM=["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
+const ELEMENTS=["fire","fire","air","water","fire","earth","air","water","fire","earth","air","water"];
+const ELEMENT_NAMES=["Ogień","Ogień","Powietrze","Woda","Ogień","Ziemia","Powietrze","Woda","Ogień","Ziemia","Powietrze","Woda"];
+const PLANET_SYM={sun:"☉",moon:"☽",mercury:"☿",venus:"♀",mars:"♂",jupiter:"♃",saturn:"♄",uranus:"♅",neptune:"♆",pluto:"♇",node:"☊",asc:"ASC",mc:"MC"};
+const PLANET_PL={sun:"Słońce",moon:"Księżyc",mercury:"Merkury",venus:"Wenus",mars:"Mars",jupiter:"Jowisz",saturn:"Saturn",uranus:"Uran",neptune:"Neptun",pluto:"Pluton",node:"Węzeł Płn.",asc:"Ascendent",mc:"MC"};
+
+function toSign(deg){const n=N(deg),i=Math.floor(n/30);return{sign:SIGNS[i],sym:SIGN_SYM[i],element:ELEMENTS[i],elementName:ELEMENT_NAMES[i],deg:Math.floor(n%30),min:Math.floor((n%1)*60),raw:n,idx:i};}
+function house(p,a){return Math.floor(N(p-a)/30)+1;}
+
+// ── Full chart calc ─────────────────────────────────
+function calcChart(dateStr,timeStr,lat,lon){
+  const[y,m,d]=dateStr.split('-').map(Number),[h,mi]=timeStr.split(':').map(Number);
+  const J=julianDay(y,m,d,h+mi/60-1);
+  const ascDeg=calcAsc(J,lat,lon),mcDeg=calcMC(J,lon);
+  const rawVals={
+    sun:sunLon(J),moon:moonLon(J),
+    mercury:innerLon(J,252.2509,149472.6746),venus:innerLon(J,181.9798,58517.8157),
+    mars:outerLon(J,355.433,19140.299),jupiter:outerLon(J,34.351,3034.906),
+    saturn:outerLon(J,50.077,1222.114),uranus:outerLon(J,314.055,428.488),
+    neptune:outerLon(J,304.349,218.486),pluto:outerLon(J,238.951,144.960),
+    node:nodeLon(J),asc:ascDeg,mc:mcDeg
+  };
+  const planets={};
+  for(const[k,v]of Object.entries(rawVals)){
+    planets[k]={...toSign(v),house:(['asc','mc','node'].includes(k)?null:house(v,ascDeg)),rawDeg:v};
+  }
+  return{planets, asc:planets.asc, mc:planets.mc, node:planets.node, jd:J};
+}
+
+// ══════════════════════════════════════════════════
+// ASPECT ENGINE
+// ══════════════════════════════════════════════════
+const ASPECT_DEFS=[
+  {name:"Koniunkcja",sym:"☌",angle:0,orb:8,nature:"neutral",css:"asp-con",short:"Con"},
+  {name:"Trygon",sym:"△",angle:120,orb:8,nature:"harmony",css:"asp-tri",short:"Tri"},
+  {name:"Sekstyl",sym:"⚹",angle:60,orb:5,nature:"harmony",css:"asp-sxt",short:"Sxt"},
+  {name:"Kwadrat",sym:"□",angle:90,orb:7,nature:"tension",css:"asp-squ",short:"Squ"},
+  {name:"Opozycja",sym:"☍",angle:180,orb:8,nature:"tension",css:"asp-opp",short:"Opp"},
+  {name:"Kwinkunks",sym:"⚻",angle:150,orb:3,nature:"tension",css:"asp-qui",short:"Qui"},
+];
+const PLANET_KEYS=["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"];
+
+function calcAspects(planets){
+  const aspects=[];
+  for(let i=0;i<PLANET_KEYS.length;i++){
+    for(let j=i+1;j<PLANET_KEYS.length;j++){
+      const p1=PLANET_KEYS[i],p2=PLANET_KEYS[j];
+      const d1=planets[p1].rawDeg,d2=planets[p2].rawDeg;
+      let diff=Math.abs(d1-d2);
+      if(diff>180)diff=360-diff;
+      for(const asp of ASPECT_DEFS){
+        const orb=Math.abs(diff-asp.angle);
+        if(orb<=asp.orb){
+          aspects.push({p1,p2,asp,orb:orb.toFixed(1)});
+          break;
+        }
+      }
+    }
+  }
+  // Sort: tightest orb first
+  aspects.sort((a,b)=>parseFloat(a.orb)-parseFloat(b.orb));
+  return aspects;
+}
+
+// ══════════════════════════════════════════════════
+// CITIES DB
+// ══════════════════════════════════════════════════
+const CITIES={
+  "kościerzyna":[54.12,17.98],"gdańsk":[54.35,18.65],"warszawa":[52.23,21.01],
+  "kraków":[50.06,19.94],"wrocław":[51.11,17.04],"poznań":[52.41,16.93],
+  "łódź":[51.77,19.46],"szczecin":[53.43,14.55],"katowice":[50.26,19.02],
+  "bydgoszcz":[53.12,18.00],"lublin":[51.25,22.57],"białystok":[53.13,23.16],
+  "gdynia":[54.52,18.53],"toruń":[53.01,18.61],"rzeszów":[50.04,21.99],
+  "oslo":[59.91,10.75],"bergen":[60.39,5.32],"trondheim":[63.43,10.40],
+  "stavanger":[58.97,5.73],"larvik":[59.05,10.03],"tromsø":[69.65,18.96],
+  "drammen":[59.74,10.20],"london":[51.51,-0.13],"berlin":[52.52,13.40],
+  "paris":[48.86,2.35],"vienna":[48.21,16.37],"amsterdam":[52.37,4.90],
+  "stockholm":[59.33,18.07],"copenhagen":[55.68,12.57],"helsinki":[60.17,24.94],
+};
+function normCity(s){return s.toLowerCase().trim().replace(/[óąęśźżńćł]/g,c=>({ó:'o',ą:'a',ę:'e',ś:'s',ź:'z',ż:'z',ń:'n',ć:'c',ł:'l'}[c]||c));}
+function findCity(name){const k=normCity(name);for(const[ck,cv]of Object.entries(CITIES)){if(normCity(ck)===k||k.includes(normCity(ck))||normCity(ck).includes(k))return cv;}return null;}
+
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let STATE={chart:null,aspects:null,formData:{}};
+
+// ══════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════
+function showMain(panel){
+  ['input','data','report'].forEach(p=>{
+    document.getElementById('panel-'+p).style.display=p===panel?'block':'none';
+  });
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',['input','data','report'][i]===panel);
+  });
+}
+
+function setStep(n){
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById('st'+i);
+    if(i<n){el.className='step done';el.innerHTML='✓ '+el.textContent.replace('✓ ','');}
+    else if(i===n){el.className='step active';}
+    else{el.className='step';}
+  }
+}
+
+// ══════════════════════════════════════════════════
+// RENDER RAW DATA
+// ══════════════════════════════════════════════════
+function renderRawData(){
+  const{chart,aspects}=STATE;
+  const p=chart.planets;
+
+  // Summary stats
+  const elemCount={Ogień:0,Ziemia:0,Powietrze:0,Woda:0};
+  const modCount={Kardynalny:0,Stały:0,Zmienny:0};
+  const MOD=["Kardynalny","Stały","Zmienny"];
+  PLANET_KEYS.forEach(k=>{
+    elemCount[p[k].elementName]=(elemCount[p[k].elementName]||0)+1;
+    modCount[MOD[p[k].idx%3]]=(modCount[MOD[p[k].idx%3]]||0)+1;
+  });
+  const dominant=Object.entries(elemCount).sort((a,b)=>b[1]-a[1])[0][0];
+  const stats=[
+    {n:aspects.length,l:"Aspektów"},
+    {n:aspects.filter(a=>a.asp.nature==='harmony').length,l:"Harmonijnych"},
+    {n:aspects.filter(a=>a.asp.nature==='tension').length,l:"Napięciowych"},
+    {n:dominant,l:"Dominujący Żywioł"},
+  ];
+  document.getElementById('summary-stats').innerHTML=stats.map(s=>`<div class="card"><div style="font-size:20px;font-weight:700;color:var(--gold)">${s.n}</div><div style="font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:3px">${s.l}</div></div>`).join('');
+
+  // Planet table
+  const pRows=Object.entries(p).map(([k,v])=>`<tr>
+    <td><span class="planet-name">${PLANET_SYM[k]||''} ${PLANET_PL[k]}</span></td>
+    <td><span class="sign-badge ${v.element}">${v.sym} ${v.sign}</span></td>
+    <td style="font-family:monospace;font-size:11px;color:var(--slate)">${v.deg}°${v.min}'</td>
+    <td>${v.house?`<span class="house-num">Dom ${v.house}</span>`:'—'}</td>
+    <td style="font-size:11px;color:var(--text3)">${v.elementName}</td>
+  </tr>`).join('');
+  document.getElementById('planet-table').innerHTML=`<thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th><th>Żywioł</th></tr></thead><tbody>${pRows}</tbody>`;
+
+  // Aspects
+  const aspHtml=aspects.map(a=>`<div class="aspect-row">
+    <div class="aspect-symbol ${a.asp.css}">${a.asp.sym}</div>
+    <div class="aspect-planets">${PLANET_SYM[a.p1]} ${PLANET_PL[a.p1]} — ${PLANET_SYM[a.p2]} ${PLANET_PL[a.p2]}</div>
+    <span class="aspect-nature nat-${a.asp.nature}">${a.asp.name}</span>
+    <span class="aspect-orb">orba ${a.orb}°</span>
+  </div>`).join('');
+  document.getElementById('aspects-list').innerHTML=aspHtml||'<div style="color:var(--text3);font-size:12px;padding:8px">Brak aspektów w zakresie orb</div>';
+}
+
+// ══════════════════════════════════════════════════
+// SECTION DEFINITIONS
+// ══════════════════════════════════════════════════
+function getSections(fn, p, asc, mc, node, aspects, relocCity, yr, lang) {
+  const aspLines = aspects.slice(0,15).map(a=>
+    `${PLANET_PL[a.p1]} ${a.asp.sym} ${a.asp.name} ${PLANET_PL[a.p2]} (orba ${a.orb}°)`
+  ).join('\n');
+
+  const ctx = `Astrolog psychologiczno-ewolucyjny (styl Liz Greene / Richard Tarnas).
+Osoba: ${fn}
+Słońce: ${p.sun.deg}° ${p.sun.sign} Dom ${p.sun.house}
+Księżyc: ${p.moon.deg}° ${p.moon.sign} Dom ${p.moon.house}
+Ascendent: ${asc.deg}° ${asc.sign}
+MC: ${mc.deg}° ${mc.sign}
+Merkury: ${p.mercury.deg}° ${p.mercury.sign} Dom ${p.mercury.house}
+Wenus: ${p.venus.deg}° ${p.venus.sign} Dom ${p.venus.house}
+Mars: ${p.mars.deg}° ${p.mars.sign} Dom ${p.mars.house}
+Jowisz: ${p.jupiter.deg}° ${p.jupiter.sign} Dom ${p.jupiter.house}
+Saturn: ${p.saturn.deg}° ${p.saturn.sign} Dom ${p.saturn.house}
+Uran: ${p.uranus.deg}° ${p.uranus.sign} Dom ${p.uranus.house}
+Neptun: ${p.neptune.deg}° ${p.neptune.sign} Dom ${p.neptune.house}
+Pluton: ${p.pluto.deg}° ${p.pluto.sign} Dom ${p.pluto.house}
+Węzeł Północny: ${node.deg}° ${node.sign}
+ASPEKTY: ${aspLines}`;
+
+  const langInstr = {pl:'Pisz po polsku.',en:'Write in English.',no:'Skriv på norsk.'}[lang]||'Pisz po polsku.';
+  const rule = `ZASADY: Tylko czysty HTML (h2,h3,p,ul,li,ol,table,tr,td,th,strong). Zero tekstu poza HTML. Min. 250 słów. Cytuj konkretne aspekty. Bądź głęboki i spersonalizowany — NIE formułki z horoskopu. ${langInstr}`;
+
+  return [
+    {
+      num:1, title:'Mapa Psychologiczna — Synteza Całości',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>1. Mapa Psychologiczna — Synteza Całości</h2>\nNIE opisuj planet osobno. Pokaż jak SIEĆ ASPEKTÓW tworzy spójny wzorzec psychologiczny ${fn}. Jak napięcia (kwadraty, opozycje) i harmonie (trygony, sekstyly) ze sobą dialogują. Co z tego wynika dla tożsamości i drogi życiowej. Min. 350 słów.`
+    },
+    {
+      num:2, title:'Słońce, Księżyc i Ascendent — Trójkąt Tożsamości',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>2. Słońce, Księżyc i Ascendent — Trójkąt Tożsamości</h2>\nNie opisuj każdego z osobna — pokaż jak Słońce w ${p.sun.sign}, Księżyc w ${p.moon.sign} i Ascendent w ${asc.sign} tworzą wewnętrzne napięcie lub harmonię. Jak ego (Słońce) różni się od potrzeb emocjonalnych (Księżyc) i maski społecznej (Ascendent). Co ${fn} musi zintegrować. Min. 300 słów.`
+    },
+    {
+      num:3, title:'Rdzeń Osobowości i Cień (perspektywa Jungowska)',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>3. Rdzeń Osobowości i Cień (perspektywa Jungowska)</h2>\nCo Persona ${fn}a prezentuje światu, a co Cień skrywa. Które planety i aspekty wskazują na nieświadome wzorce. Potencjał transformacji przez integrację Cienia. Odwołaj się do konkretnych aspektów z danych. Min. 280 słów.`
+    },
+    {
+      num:4, title:'Miłość, Relacje i Wzorce Przywiązania',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>4. Miłość, Relacje i Wzorce Przywiązania</h2>\nWenus w ${p.venus.sign} Dom ${p.venus.house}, Jowisz w ${p.jupiter.sign} Dom ${p.jupiter.house}, aspekty do Wenus i Księżyca. Jak ${fn} kocha, czego szuka w partnerze, jakie wzorce przywiązania powtarza. Co przyciąga i co odpycha. Wyzwania i dary w relacjach. Min. 280 słów.`
+    },
+    {
+      num:5, title:'Zdrowie, Ciało i Energia Życiowa',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>5. Zdrowie, Ciało i Energia Życiowa</h2>\nMars w ${p.mars.sign} Dom ${p.mars.house}, Dom 1 (Ascendent ${asc.sign}), Dom 6. Strefy zagrożeń i zasobów witalnych. Jak ${fn} zarządza energią, gdzie traci, gdzie ładuje. Konkretne wskazówki dla zdrowia i witalności wynikające z mapy. Min. 250 słów.`
+    },
+    {
+      num:6, title:'Duchowość, Sens i Ścieżka Ewolucyjna',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>6. Duchowość, Sens i Ścieżka Ewolucyjna</h2>\nWęzeł Północny w ${node.sign} jako karmiczne przeznaczenie. Neptun w ${p.neptune.sign} Dom ${p.neptune.house}, Dom 12, Dom 9. Jaka jest misja życiowa ${fn}a w ujęciu ewolucyjnym. Co zostało wypracowane w poprzednich wcieleniach (Węzeł Płd.), a co jest do rozwinięcia. Min. 280 słów.`
+    },
+    {
+      num:7, title:'Główne Talenty i Potencjał',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>7. Główne Talenty i Potencjał</h2>\nPodziel na: Talenty Intelektualne (Merkury ${p.mercury.sign}, Mars ${p.mars.sign}), Talenty Społeczne (Wenus, Jowisz), Talenty Ukryte (planety w Dom 12, trudne aspekty jako potencjał). Użyj tabel HTML dla pierwszych dwóch grup. Każdy talent uzasadnij konkretnym aspektem lub pozycją. Min. 280 słów.`
+    },
+    {
+      num:8, title:'Biznes, Kariera i Finanse',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>8. Biznes, Kariera i Finanse</h2>\nMC w ${mc.sign}, Dom 10, Dom 8 (Pluton ${p.pluto.sign}), Dom 2. Tabela HTML: 6 rekomendowanych branż/działań z uzasadnieniem przez aspekty. Tabela HTML: 4 rzeczy do unikania z uzasadnieniem. Styl kariery ${fn}a — czy lider, czy ekspert, czy przedsiębiorca. Min. 300 słów.`
+    },
+    {
+      num:9, title:'Wyzwania Karmiczne i Lekcje Życiowe',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>9. Wyzwania Karmiczne i Lekcje Życiowe</h2>\nSaturn w ${p.saturn.sign} Dom ${p.saturn.house} jako główna lekcja karmiczna. Trudne aspekty jako zadania do przepracowania. Węzeł Południowy — co przynosi ze sobą, co musi zostawić. Konkretne wzorce życiowe które powtarzają się jako sygnał. Jak zamienić wyzwania w mądrość. Min. 280 słów.`
+    },
+    {
+      num:10, title: relocCity ? `Analiza Relokacji do ${relocCity}` : 'Analiza Miejsca Zamieszkania',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>10. ${relocCity?`Analiza Relokacji do ${relocCity}`:'Analiza Obecnego Miejsca Zamieszkania'}</h2>\n${relocCity?`Jak przeprowadzka do ${relocCity} zmienia strukturę domów, przesuwa Ascendent i MC, aktywuje lub wygasza energie planet. Co ${relocCity} otwiera dla ${fn}a, jakie nowe możliwości i jakie wyzwania.`:`Jak obecne miejsce zamieszkania wpływa na realizację potencjału. Które energie są aktywowane, które wygaszone.`} Min. 220 słów.`
+    },
+    {
+      num:11, title:`Aktualne Tranzyty ${yr}/${yr+1}`,
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>11. Aktualne Tranzyty ${yr}/${yr+1}</h2>\nOpisz 5 najważniejszych aktualnych tranzytów przez planety natalne ${fn}a. Dla każdego: h3 z nazwą tranzytu, lista efektów (min. 4 punkty), czas trwania, jak to wykorzystać lub się przygotować. Bądź precyzyjny — podaj które planety tranzytowe aktywują które planety natalne. Min. 300 słów łącznie.`
+    },
+    {
+      num:12, title:'Synteza Końcowa i Plan Działania',
+      prompt:`${ctx}\n\n${rule}\n\nNapisz sekcję:\n<h2>12. Synteza Końcowa i Plan Działania</h2>\n<h3>Kim Jest ${fn}?</h3>[2-3 akapity esencji — zintegrowana synteza całej mapy]\n<h3>Kluczowe Rekomendacje Biznesowe</h3>[lista numerowana, 5 konkretnych rekomendacji]\n<h3>Co Robić w ${yr}</h3>[lista ✓ działań + lista ✗ do unikania]\n<h3>Mantra ${fn}a</h3>[jedno zdanie-mantra będące esencją tej mapy astrologicznej]\nMin. 300 słów.`
+    },
+  ];
+}
+
+// ══════════════════════════════════════════════════
+// SINGLE SECTION API CALL
+// ══════════════════════════════════════════════════
+async function callSection(prompt) {
+  const key = getApiKey();
+  if(!key) throw new Error('Brak klucza API. Kliknij 🔑 w nagłówku.');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8000,
+      messages: [{role: 'user', content: prompt}]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err?.error?.message || 'API error ' + res.status);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text || '';
+}
+
+// ══════════════════════════════════════════════════
+// MAIN PIPELINE
+// ══════════════════════════════════════════════════
+async function startPipeline(){
+  const name=document.getElementById('f-name').value.trim();
+  const date=document.getElementById('f-date').value;
+  const time=document.getElementById('f-time').value;
+  const birth=document.getElementById('f-birth').value.trim();
+  const reloc=document.getElementById('f-reloc').value.trim();
+  const lang=document.getElementById('f-lang').value;
+  const errEl=document.getElementById('err-msg');
+
+  errEl.style.display='none';
+  if(!name||!date||!time||!birth){errEl.textContent='Wypełnij wszystkie wymagane pola.';errEl.style.display='flex';return;}
+  const coords=findCity(birth);
+  if(!coords){errEl.textContent=`Nieznane miasto: "${birth}". Spróbuj: Warszawa, Kraków, Oslo, Larvik…`;errEl.style.display='flex';return;}
+
+  STATE.formData={name,date,time,birth,reloc,lang};
+  document.getElementById('panel-input').style.display='none';
+  document.getElementById('loading-screen').style.display='block';
+
+  try{
+    const fn = name.split(' ')[0];
+
+    // Steps 1-3: calculations
+    setStep(1); await sleep(200); setStep(2);
+    const chart = calcChart(date, time, coords[0], coords[1]);
+    STATE.chart = chart;
+    await sleep(200);
+
+    setStep(3);
+    const aspects = calcAspects(chart.planets);
+    STATE.aspects = aspects;
+    await sleep(200);
+
+    // Step 4: sequential section generation
+    setStep(4);
+    const yr = new Date().getFullYear();
+    const {planets: p, asc, node} = chart;
+    const mc = chart.planets.mc;
+    const sections = getSections(fn, p, asc, mc, node, aspects, reloc, yr, lang);
+
+    // Update loading UI for section progress
+    document.getElementById('load-title').textContent = 'GENEROWANIE RAPORTU';
+    const stepsEl = document.querySelector('.loading-steps');
+    stepsEl.innerHTML = `
+      <div style="color:var(--text3);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Postęp generowania</div>
+      <div style="background:var(--surface2);border-radius:8px;height:6px;margin-bottom:12px;overflow:hidden">
+        <div id="prog-bar" style="background:var(--gold);height:100%;width:0%;transition:width .4s ease;border-radius:8px"></div>
+      </div>
+      <div id="prog-label" style="color:var(--gold);font-size:12px;font-style:italic;min-height:20px"></div>
+      <div id="prog-sections" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:12px"></div>`;
+
+    // Init section dots
+    const dotsEl = document.getElementById('prog-sections');
+    dotsEl.innerHTML = sections.map(s =>
+      `<div id="dot-${s.num}" style="background:var(--surface3);border-radius:4px;padding:4px 2px;text-align:center;font-size:9px;color:var(--text3)">${s.num}</div>`
+    ).join('');
+
+    let fullHtml = '';
+    for (const sec of sections) {
+      // Update progress
+      document.getElementById('prog-label').textContent = `Sekcja ${sec.num}/12 — ${sec.title}…`;
+      document.getElementById('prog-bar').style.width = ((sec.num-1)/12*100)+'%';
+      document.getElementById(`dot-${sec.num}`).style.background = 'rgba(201,168,76,0.3)';
+      document.getElementById(`dot-${sec.num}`).style.color = 'var(--gold)';
+
+      const sectionHtml = await callSection(sec.prompt);
+      fullHtml += sectionHtml + '\n';
+
+      // Mark done
+      document.getElementById(`dot-${sec.num}`).style.background = 'rgba(16,185,129,0.2)';
+      document.getElementById(`dot-${sec.num}`).style.color = 'var(--green)';
+      document.getElementById('prog-bar').style.width = (sec.num/12*100)+'%';
+    }
+
+    document.getElementById('prog-label').textContent = '✓ Raport gotowy!';
+    STATE.reportHtml = fullHtml;
+
+    await sleep(600);
+
+    // Render everything
+    renderRawData();
+    renderReport();
+
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('tab-data').style.opacity='1';document.getElementById('tab-data').style.pointerEvents='auto';
+    document.getElementById('tab-report').style.opacity='1';document.getElementById('tab-report').style.pointerEvents='auto';
+    showMain('report');
+
+  }catch(e){
+    document.getElementById('loading-screen').style.display='none';
+    document.getElementById('panel-input').style.display='block';
+    document.getElementById('err-msg').textContent='Błąd: '+e.message;
+    document.getElementById('err-msg').style.display='flex';
+  }
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ══════════════════════════════════════════════════
+// RENDER REPORT
+// ══════════════════════════════════════════════════
+function renderReport(){
+  const{formData,chart,aspects,reportHtml}=STATE;
+  const p=chart.planets;
+
+  document.getElementById('report-title').textContent=formData.name;
+
+  // Meta chips
+  const chips=[
+    {l:'Słońce',v:p.sun.sym+' '+p.sun.sign,s:p.sun.deg+'° Dom '+p.sun.house},
+    {l:'Księżyc',v:p.moon.sym+' '+p.moon.sign,s:p.moon.deg+'° Dom '+p.moon.house},
+    {l:'Ascendent',v:p.asc.sym+' '+p.asc.sign,s:p.asc.deg+'°'},
+    {l:'MC',v:p.mc.sym+' '+p.mc.sign,s:p.mc.deg+'°'},
+    {l:'Aspektów',v:aspects.length,s:aspects.filter(a=>a.asp.nature==='tension').length+' napięciowych'},
+    {l:'Data',v:formData.date,s:formData.time+' · '+formData.birth},
+  ];
+  document.getElementById('report-meta').innerHTML=chips.map(c=>`<div class="meta-chip"><div class="label">${c.l}</div><div class="value">${c.v}</div><div class="sub">${c.s}</div></div>`).join('');
+
+  document.getElementById('report-body').innerHTML=reportHtml;
+}
+
+// ══════════════════════════════════════════════════
+// PDF GENERATION
+// ══════════════════════════════════════════════════
+async function downloadPDF(){
+  const btn=document.getElementById('pdf-btn');
+  btn.textContent='⏳…';btn.disabled=true;
+  try{
+    const{formData,chart,aspects,reportHtml}=STATE;
+    const{name,date,time,birth,reloc}=formData;
+    const p=chart.planets,yr=new Date().getFullYear();
+    const monthYear=new Date().toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+
+    // Build planet table for PDF
+    const pdfPlanetRows=Object.entries(p).map(([k,v])=>`<tr><td>${PLANET_SYM[k]||''} ${PLANET_PL[k]}</td><td>${v.sym} ${v.sign}</td><td>${v.deg}°${v.min}'</td><td>${v.house?'Dom '+v.house:'—'}</td></tr>`).join('');
+    const pdfAspectRows=aspects.slice(0,20).map(a=>`<div class="pdf-aspect-row"><span class="pdf-aspect-sym">${a.asp.sym}</span><span>${PLANET_PL[a.p1]} ${a.asp.name} ${PLANET_PL[a.p2]}</span><span style="margin-left:auto;color:#64748b;font-size:9pt">orba ${a.orb}°</span></div>`).join('');
+
+    const stage=document.getElementById('pdf-stage');
+    stage.innerHTML=`
+<div style="text-align:center;padding-bottom:24px">
+  <div style="font-size:16pt;color:#c9a84c;margin-bottom:8px">✦ ASTRO PRO ✦</div>
+  <h1>${name.toUpperCase()}</h1>
+  <div class="pdf-cover-sub">${date} · ${time} · ${birth}${reloc?` · Relokacja: ${reloc}`:''}</div>
+  <div class="pdf-cover-sub">Pełna Analiza Psychologiczno-Ewolucyjna ${yr}</div>
+</div>
+<hr class="pdf-divider">
+<h2>Dane Horoskopu</h2>
+<table><thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th></tr></thead><tbody>${pdfPlanetRows}</tbody></table>
+<h2>Aspekty Planetarne</h2>
+<div class="pdf-aspects">${pdfAspectRows}</div>
+<hr class="pdf-divider">
+${reportHtml}
+<div class="pdf-footer">✦ AstroPro — Profesjonalna Analiza Astrologiczna ✦<br>Wygenerowano: ${monthYear} · Obliczenia: VSOP87 + Silnik Aspektów</div>`;
+
+    // Make visible for html2canvas (mobile fix)
+    stage.style.visibility='visible';
+    stage.style.zIndex='9999';
+    stage.style.position='absolute';
+    stage.style.top='0';
+    stage.style.left='0';
+    await sleep(200); // let browser paint
+
+    const canvas=await html2canvas(stage,{
+      scale:1.4,
+      useCORS:true,
+      allowTaint:true,
+      backgroundColor:'#ffffff',
+      width:800,
+      windowWidth:800,
+      scrollX:0,
+      scrollY:0,
+      x:0,
+      y:0,
+    });
+
+    // Hide again
+    stage.style.visibility='hidden';
+    stage.style.zIndex='-1';
+    stage.innerHTML='';
+
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pW=pdf.internal.pageSize.getWidth(),pH=pdf.internal.pageSize.getHeight();
+    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const imgH=(canvas.height*pW)/canvas.width;
+    let y=0;
+    while(y<imgH){if(y>0)pdf.addPage();pdf.addImage(imgData,'JPEG',0,-y,pW,imgH);y+=pH;}
+    pdf.save(`AstroPro_${name.replace(/\s+/g,'_')}_${date}.pdf`);
+  }catch(e){alert('Błąd PDF: '+e.message);}
+  finally{btn.textContent='⬇ PDF';btn.disabled=false;}
+}
+</script>
+</body>
+</html>
