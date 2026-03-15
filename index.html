@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AstroPro — Analiza Horoskopu</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cinzel:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -741,88 +740,314 @@ function renderReport(){
 }
 
 // ══════════════════════════════════════════════════
-// PDF GENERATION
+// PDF — prawdziwy tekst, bez screenshota
 // ══════════════════════════════════════════════════
 async function downloadPDF(){
   const btn=document.getElementById('pdf-btn');
-  btn.textContent='⏳…';btn.disabled=true;
+  btn.textContent='⏳ PDF…'; btn.disabled=true;
   try{
     const{formData,chart,aspects,reportHtml}=STATE;
     const{name,date,time,birth,reloc}=formData;
-    const p=chart.planets,yr=new Date().getFullYear();
+    const p=chart.planets;
+    const yr=new Date().getFullYear();
     const monthYear=new Date().toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+    const{jsPDF}=window.jspdf;
 
-    // Build planet table for PDF
-    const pdfPlanetRows=Object.entries(p).map(([k,v])=>`<tr><td>${PLANET_SYM[k]||''} ${PLANET_PL[k]}</td><td>${v.sym} ${v.sign}</td><td>${v.deg}°${v.min}'</td><td>${v.house?'Dom '+v.house:'—'}</td></tr>`).join('');
-    const pdfAspectRows=aspects.slice(0,20).map(a=>`<div class="pdf-aspect-row"><span class="pdf-aspect-sym">${a.asp.sym}</span><span>${PLANET_PL[a.p1]} ${a.asp.name} ${PLANET_PL[a.p2]}</span><span style="margin-left:auto;color:#64748b;font-size:9pt">orba ${a.orb}°</span></div>`).join('');
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',putOnlyUsedFonts:true});
+    const PW=210, PH=297, ML=18, MR=18, MT=18, MB=20;
+    const TW=PW-ML-MR;
+    let y=MT;
 
-    const stage=document.getElementById('pdf-stage');
-    stage.innerHTML=`
-<div style="text-align:center;padding-bottom:24px">
-  <div style="font-size:16pt;color:#c9a84c;margin-bottom:8px">✦ ASTRO PRO ✦</div>
-  <h1>${name.toUpperCase()}</h1>
-  <div class="pdf-cover-sub">${date} · ${time} · ${birth}${reloc?` · Relokacja: ${reloc}`:''}</div>
-  <div class="pdf-cover-sub">Pełna Analiza Psychologiczno-Ewolucyjna ${yr}</div>
-</div>
-<hr class="pdf-divider">
-<h2>Dane Horoskopu</h2>
-<table><thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th></tr></thead><tbody>${pdfPlanetRows}</tbody></table>
-<h2>Aspekty Planetarne</h2>
-<div class="pdf-aspects">${pdfAspectRows}</div>
-<hr class="pdf-divider">
-${reportHtml}
-<div class="pdf-footer">✦ AstroPro — Profesjonalna Analiza Astrologiczna ✦<br>Wygenerowano: ${monthYear} · Obliczenia: VSOP87 + Silnik Aspektów</div>`;
+    // ── helpers ──────────────────────────────────────
+    function checkPage(needed=6){
+      if(y+needed>PH-MB){ pdf.addPage(); y=MT; }
+    }
 
-    // Make visible for html2canvas (mobile fix)
-    stage.style.visibility='visible';
-    stage.style.zIndex='9999';
-    stage.style.position='absolute';
-    stage.style.top='0';
-    stage.style.left='0';
-    await sleep(200); // let browser paint
+    function setFont(style,size,color){
+      if(style==='bold') pdf.setFont('helvetica','bold');
+      else if(style==='italic') pdf.setFont('helvetica','italic');
+      else pdf.setFont('helvetica','normal');
+      pdf.setFontSize(size);
+      if(color) pdf.setTextColor(...color);
+      else pdf.setTextColor(30,41,59);
+    }
 
-    const canvas=await html2canvas(stage,{
-      scale:1.4,
-      useCORS:true,
-      allowTaint:true,
-      backgroundColor:'#ffffff',
-      width:800,
-      windowWidth:800,
-      scrollX:0,
-      scrollY:0,
-      x:0,
-      y:0,
+    function addText(text,x,w,size,style,color,lineH){
+      setFont(style,size,color);
+      const lh=lineH||(size*0.45);
+      const lines=pdf.splitTextToSize(stripHtml(text),w);
+      lines.forEach(line=>{
+        checkPage(lh+1);
+        pdf.text(line,x,y);
+        y+=lh;
+      });
+      return lines.length;
+    }
+
+    function stripHtml(html){
+      return html.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#[0-9]+;/g,'').replace(/\s+/g,' ').trim();
+    }
+
+    function drawLine(col,thick){
+      pdf.setDrawColor(...(col||[201,168,76]));
+      pdf.setLineWidth(thick||0.3);
+      pdf.line(ML,y,PW-MR,y);
+      y+=3;
+    }
+
+    function addH1(text){
+      checkPage(20);
+      setFont('bold',18,[201,168,76]);
+      const lines=pdf.splitTextToSize(text.toUpperCase(),TW);
+      lines.forEach(l=>{pdf.text(l,PW/2,y,{align:'center'}); y+=8;});
+      y+=2;
+    }
+
+    function addH2(text){
+      checkPage(14);
+      y+=4;
+      setFont('bold',12,[30,58,138]);
+      const lines=pdf.splitTextToSize(text,TW);
+      lines.forEach(l=>{pdf.text(l,ML,y); y+=6;});
+      drawLine([201,168,76],0.4);
+    }
+
+    function addH3(text){
+      checkPage(10);
+      y+=3;
+      setFont('bold',10,[122,92,16]);
+      pdf.text(stripHtml(text).toUpperCase(),ML,y);
+      y+=5;
+    }
+
+    function addPara(text){
+      if(!text.trim()) return;
+      setFont('normal',9.5,[30,41,59]);
+      const lh=5;
+      const lines=pdf.splitTextToSize(stripHtml(text),TW);
+      lines.forEach(l=>{checkPage(lh+1); pdf.text(l,ML,y); y+=lh;});
+      y+=2;
+    }
+
+    function addLi(text){
+      setFont('normal',9,[51,65,85]);
+      const bullet='•  ';
+      const indent=4;
+      const lines=pdf.splitTextToSize(stripHtml(text),TW-indent);
+      lines.forEach((l,i)=>{
+        checkPage(5);
+        pdf.text(i===0?bullet:'   ',ML,y);
+        pdf.text(l,ML+indent,y);
+        y+=4.8;
+      });
+    }
+
+    function addOli(text,n){
+      setFont('normal',9,[51,65,85]);
+      const indent=5;
+      const lines=pdf.splitTextToSize(stripHtml(text),TW-indent);
+      lines.forEach((l,i)=>{
+        checkPage(5);
+        pdf.text(i===0?n+'.':'   ',ML,y);
+        pdf.text(l,ML+indent,y);
+        y+=4.8;
+      });
+    }
+
+    // ── Table renderer ────────────────────────────────
+    function addTable(node){
+      const rows=[...node.querySelectorAll('tr')];
+      if(!rows.length) return;
+      const cols=rows[0].children.length||2;
+      const colW=TW/cols;
+      checkPage(10);
+
+      rows.forEach((row,ri)=>{
+        const cells=[...row.children];
+        const isHead=row.parentElement.tagName==='THEAD'||ri===0&&row.querySelector('th');
+        const cellH=6;
+        // estimate row height
+        let maxLines=1;
+        cells.forEach(c=>{
+          const lines=pdf.splitTextToSize(stripHtml(c.textContent),colW-4);
+          if(lines.length>maxLines) maxLines=lines.length;
+        });
+        const rowH=maxLines*cellH+3;
+        checkPage(rowH+2);
+
+        if(isHead){
+          pdf.setFillColor(30,58,138);
+          pdf.rect(ML,y-4,TW,rowH,'F');
+          setFont('bold',8.5,[201,168,76]);
+        } else {
+          if(ri%2===0) pdf.setFillColor(248,250,252);
+          else pdf.setFillColor(255,255,255);
+          pdf.rect(ML,y-4,TW,rowH,'F');
+          setFont('normal',8.5,[30,41,59]);
+        }
+
+        cells.forEach((c,ci)=>{
+          const cx=ML+ci*colW+2;
+          const lines=pdf.splitTextToSize(stripHtml(c.textContent),colW-4);
+          lines.forEach((l,li)=>{ pdf.text(l,cx,y+li*cellH); });
+        });
+
+        // border bottom
+        pdf.setDrawColor(226,232,240);
+        pdf.setLineWidth(0.1);
+        pdf.line(ML,y-4+rowH,PW-MR,y-4+rowH);
+        y+=rowH;
+      });
+      y+=4;
+    }
+
+    // ── Parse HTML nodes recursively ──────────────────
+    function parseNode(node){
+      if(node.nodeType===3){ // text node
+        const t=node.textContent.trim();
+        if(t) addPara(t);
+        return;
+      }
+      const tag=node.tagName?.toLowerCase();
+      if(!tag) return;
+
+      if(tag==='h2'){ addH2(stripHtml(node.innerHTML)); return; }
+      if(tag==='h3'){ addH3(stripHtml(node.innerHTML)); return; }
+      if(tag==='p'){
+        // handle strong/em inline
+        addPara(node.innerHTML);
+        return;
+      }
+      if(tag==='ul'||tag==='ol'){
+        let n=1;
+        [...node.children].forEach(li=>{
+          if(tag==='ol') addOli(li.innerHTML,n++);
+          else addLi(li.innerHTML);
+        });
+        y+=2;
+        return;
+      }
+      if(tag==='table'){ addTable(node); return; }
+      if(tag==='hr'){ drawLine(); return; }
+      if(tag==='strong'||tag==='b'||tag==='em'||tag==='span'||tag==='div'||tag==='section'||tag==='article'){
+        [...node.childNodes].forEach(parseNode);
+        return;
+      }
+      // default: recurse
+      [...node.childNodes].forEach(parseNode);
+    }
+
+    // ══════════════════════════════════════════════════
+    // BUILD PDF
+    // ══════════════════════════════════════════════════
+
+    // ── Cover page ────────────────────────────────────
+    pdf.setFillColor(11,15,26);
+    pdf.rect(0,0,PW,PH,'F');
+
+    // Gold decorative line top
+    pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.8);
+    pdf.line(ML,28,PW-MR,28);
+
+    setFont('normal',11,[201,168,76]);
+    pdf.text('✦  ASTRO PRO  ✦',PW/2,42,{align:'center'});
+
+    setFont('bold',22,[201,168,76]);
+    const nameLines=pdf.splitTextToSize(name.toUpperCase(),TW);
+    nameLines.forEach((l,i)=>{pdf.text(l,PW/2,58+i*11,{align:'center'});});
+
+    setFont('normal',10,[148,163,184]);
+    pdf.text(`${date}  ·  ${time}  ·  ${birth}`,PW/2,78,{align:'center'});
+    if(reloc) pdf.text(`Relokacja: ${reloc}`,PW/2,85,{align:'center'});
+
+    setFont('italic',9,[100,116,139]);
+    pdf.text(`Pełna Analiza Psychologiczno-Ewolucyjna ${yr}`,PW/2,96,{align:'center'});
+
+    pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.8);
+    pdf.line(ML,103,PW-MR,103);
+
+    // Planet summary on cover
+    y=115;
+    setFont('bold',8,[201,168,76]);
+    pdf.text('DANE HOROSKOPU',PW/2,y,{align:'center'}); y+=7;
+
+    const coverPlanets=Object.entries(p).slice(0,8);
+    coverPlanets.forEach(([k,v],i)=>{
+      const col=i%2;
+      const row=Math.floor(i/2);
+      const cx=ML+(col*(TW/2));
+      setFont('bold',8,[148,163,184]);
+      pdf.text(PLANET_PL[k]||k,cx,y+row*7);
+      setFont('normal',8,[226,232,240]);
+      pdf.text(`${v.deg}° ${v.sign}${v.house?' Dom '+v.house:''}`,cx+22,y+row*7);
+    });
+    y+=Math.ceil(coverPlanets.length/2)*7+8;
+
+    // Footer cover
+    setFont('normal',8,[71,85,105]);
+    pdf.text(`Obliczenia: VSOP87 ±0.5°  ·  Silnik Aspektów  ·  ${aspects.length} aspektów`,PW/2,PH-14,{align:'center'});
+    pdf.text('silentmichal.github.io/astro',PW/2,PH-9,{align:'center'});
+
+    // ── Page 2: planet table + aspects ───────────────
+    pdf.addPage(); y=MT;
+    pdf.setFillColor(255,255,255);
+
+    addH1('Dane Surowe Horoskopu');
+    y+=2;
+
+    // Planet table
+    addH2('Pozycje Planet');
+    const ptmp=document.createElement('table');
+    ptmp.innerHTML=`<thead><tr><th>Planeta</th><th>Znak</th><th>Pozycja</th><th>Dom</th><th>Żywioł</th></tr></thead><tbody>`+
+      Object.entries(p).map(([k,v])=>`<tr><td>${PLANET_PL[k]||k}</td><td>${v.sym} ${v.sign}</td><td>${v.deg}°${v.min}'</td><td>${v.house?'Dom '+v.house:'—'}</td><td>${v.elementName||''}</td></tr>`).join('')+
+      `</tbody>`;
+    addTable(ptmp);
+
+    checkPage(20);
+    addH2('Aspekty Planetarne');
+    aspects.slice(0,20).forEach(a=>{
+      checkPage(6);
+      setFont('normal',9,[30,41,59]);
+      const natCol=a.asp.nature==='harmony'?[16,185,129]:a.asp.nature==='tension'?[239,68,68]:[148,163,184];
+      pdf.setTextColor(...natCol);
+      pdf.text(a.asp.sym,ML,y);
+      pdf.setTextColor(30,41,59);
+      pdf.text(`${PLANET_PL[a.p1]}  ${a.asp.name}  ${PLANET_PL[a.p2]}`,ML+6,y);
+      pdf.setTextColor(148,163,184);
+      pdf.text(`orba ${a.orb}°`,PW-MR-18,y);
+      y+=5.5;
     });
 
-    // Hide again
-    stage.style.visibility='hidden';
-    stage.style.zIndex='-1';
-    stage.innerHTML='';
+    // ── Pages 3+: AI report ───────────────────────────
+    pdf.addPage(); y=MT;
+    pdf.setFillColor(255,255,255);
 
-    const{jsPDF}=window.jspdf;
-    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const pW=pdf.internal.pageSize.getWidth();
-    const pH=pdf.internal.pageSize.getHeight();
-    const margin=12; // mm margin top+bottom
-    const usableH=pH-margin*2;
-    const imgData=canvas.toDataURL('image/jpeg',0.93);
-    const imgW=pW;
-    const imgH=(canvas.height*pW)/canvas.width;
+    setFont('bold',14,[201,168,76]);
+    pdf.text('PEŁNA ANALIZA ASTROLOGICZNA',PW/2,y,{align:'center'}); y+=6;
+    setFont('normal',9,[100,116,139]);
+    pdf.text(name,PW/2,y,{align:'center'}); y+=10;
+    drawLine([201,168,76],0.5);
 
-    let yOffset=0;
-    let pageNum=0;
-    while(yOffset<imgH){
-      if(pageNum>0) pdf.addPage();
-      // top margin on first page, normal margin on rest
-      const topMargin=pageNum===0?margin:margin;
-      pdf.addImage(imgData,'JPEG',0,topMargin-yOffset,imgW,imgH);
-      // clip to page
-      yOffset+=usableH;
-      pageNum++;
+    // Parse report HTML
+    const tmp=document.createElement('div');
+    tmp.innerHTML=STATE.reportHtml;
+    [...tmp.childNodes].forEach(parseNode);
+
+    // ── Footer on every page ──────────────────────────
+    const totalPages=pdf.internal.getNumberOfPages();
+    for(let i=1;i<=totalPages;i++){
+      pdf.setPage(i);
+      pdf.setDrawColor(201,168,76); pdf.setLineWidth(0.2);
+      pdf.line(ML,PH-12,PW-MR,PH-12);
+      setFont('normal',7.5,[148,163,184]);
+      pdf.text('AstroPro · Profesjonalna Analiza Astrologiczna',ML,PH-7);
+      pdf.text(`${i} / ${totalPages}`,PW-MR,PH-7,{align:'right'});
     }
+
     pdf.save(`AstroPro_${name.replace(/\s+/g,'_')}_${date}.pdf`);
-  }catch(e){alert('Błąd PDF: '+e.message);}
-  finally{btn.textContent='⬇ PDF';btn.disabled=false;}
+
+  }catch(e){ alert('Błąd PDF: '+e.message+'\n'+e.stack); }
+  finally{ btn.textContent='⬇ PDF'; btn.disabled=false; }
 }
 </script>
 </body>
