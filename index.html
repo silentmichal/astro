@@ -118,7 +118,7 @@ input::placeholder{color:var(--text3)}
 /* ── Responsive ── */
 @media(max-width:600px){.form-grid{grid-template-columns:1fr 1fr}.stats-bar{gap:8px}.stat{min-width:80px}}
 /* ── PDF hidden container ── */
-#pdf-stage{position:absolute;left:0;top:0;width:800px;background:#fff;color:#1e293b;font-family:Georgia,serif;padding:50px 55px;font-size:11.5pt;line-height:1.75;visibility:hidden;z-index:-1}
+#pdf-stage{position:absolute;left:0;top:0;width:800px;background:#fff;color:#1e293b;font-family:Georgia,serif;padding:48px 60px 60px 60px;font-size:11pt;line-height:1.85;visibility:hidden;z-index:-1}
 #pdf-stage h1{font-family:Georgia,serif;color:#7a5c10;font-size:20pt;text-align:center;letter-spacing:2px;margin-bottom:6px}
 #pdf-stage .pdf-cover-sub{text-align:center;color:#64748b;font-style:italic;margin-bottom:4px;font-size:11pt}
 #pdf-stage .pdf-divider{border:none;border-top:2px solid #c9a84c;margin:20px 0}
@@ -801,11 +801,25 @@ ${reportHtml}
 
     const{jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const pW=pdf.internal.pageSize.getWidth(),pH=pdf.internal.pageSize.getHeight();
-    const imgData=canvas.toDataURL('image/jpeg',0.92);
+    const pW=pdf.internal.pageSize.getWidth();
+    const pH=pdf.internal.pageSize.getHeight();
+    const margin=12; // mm margin top+bottom
+    const usableH=pH-margin*2;
+    const imgData=canvas.toDataURL('image/jpeg',0.93);
+    const imgW=pW;
     const imgH=(canvas.height*pW)/canvas.width;
-    let y=0;
-    while(y<imgH){if(y>0)pdf.addPage();pdf.addImage(imgData,'JPEG',0,-y,pW,imgH);y+=pH;}
+
+    let yOffset=0;
+    let pageNum=0;
+    while(yOffset<imgH){
+      if(pageNum>0) pdf.addPage();
+      // top margin on first page, normal margin on rest
+      const topMargin=pageNum===0?margin:margin;
+      pdf.addImage(imgData,'JPEG',0,topMargin-yOffset,imgW,imgH);
+      // clip to page
+      yOffset+=usableH;
+      pageNum++;
+    }
     pdf.save(`AstroPro_${name.replace(/\s+/g,'_')}_${date}.pdf`);
   }catch(e){alert('Błąd PDF: '+e.message);}
   finally{btn.textContent='⬇ PDF';btn.disabled=false;}
