@@ -197,10 +197,10 @@ input::placeholder{color:var(--text3)}
     </div>
   </div>
   <div class="card" style="margin-top:10px;display:flex;gap:12px;align-items:flex-start">
-    <div style="font-size:20px;flex-shrink:0">🌐</div>
+    <div style="font-size:20px;flex-shrink:0">🔒</div>
     <div>
-      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">Czy można to uruchomić jako webapp?</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.7">To narzędzie działa jako samodzielny plik HTML — można je hostować na <strong style="color:var(--gold)">GitHub Pages, Netlify lub Vercel</strong> bezpłatnie. Dla wersji płatnej (klientów) zalecane jest dodanie <strong style="color:var(--gold)">backendu proxy</strong> (np. Cloudflare Worker), który przechowuje klucz API po stronie serwera. Wówczas klienci nie widzą klucza, a Ty kontrolujesz dostęp i liczysz użycia.</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px">Bezpieczna architektura</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">Klucz API Claude i obliczenia Swiss Ephemeris działają <strong style="color:var(--gold)">wyłącznie na serwerze Vercel</strong>. Żaden klucz nie jest widoczny w przeglądarce. Dane urodzeniowe nie są nigdzie zapisywane.</div>
     </div>
   </div>
 </div>
@@ -527,13 +527,13 @@ async function startPipeline(){
 
     // Steps 1-3: calculations via Swiss Ephemeris API
     setStep(1); await sleep(200); setStep(2);
-    document.getElementById('load-txt').textContent = 'Obliczam horoskop (Swiss Ephemeris + Placidus)…';
+    document.getElementById('load-title').textContent = 'OBLICZAM HOROSKOP…'; document.getElementById('st1').textContent = '① Swiss Ephemeris + strefa czasowa'; document.getElementById('st2').textContent = '② Pozycje planet (Placidus)';
     const chart = await fetchChart(date, time, coords[0], coords[1]);
     STATE.chart = chart;
     await sleep(200);
 
     setStep(3);
-    document.getElementById('load-txt').textContent = 'Obliczam aspekty planetarne…';
+    document.getElementById('st3').textContent = '③ Obliczam aspekty…';
     const aspects = calcAspects(chart.planets);
     STATE.aspects = aspects;
     await sleep(200);
